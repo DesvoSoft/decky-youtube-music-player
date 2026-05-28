@@ -2,9 +2,17 @@ import decky
 import json
 import os
 import random
+import threading
 import time as _time
 
 _PY_MODULES = os.path.join(decky.DECKY_PLUGIN_DIR, "py_modules")
+
+try:
+    import mpv as _mpv
+    _MPV_AVAILABLE = True
+except ImportError:
+    _MPV_AVAILABLE = False
+    decky.logger.warning("python-mpv not installed — mpv audio engine unavailable")
 BROWSER_AUTH_FILE = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "browser.json")
 OAUTH_AUTH_FILE = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "oauth.json")
 OAUTH_CONFIG_FILE = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "oauth_config.json")
@@ -39,6 +47,9 @@ class Plugin:
     shuffle_order = []
     repeat = "NONE"         # NONE | ALL | ONE
     volume = 1.0
+
+    # mpv audio engine
+    player = None
 
     # ── Authentication (OAuth + browser fallback) ──────────────────
 
@@ -152,14 +163,70 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Failed to load queue: {e}")
 
+    # ── mpv audio engine ───────────────────────────────────────────
+
+    def _init_mpv(self):
+        if not _MPV_AVAILABLE:
+            decky.logger.warning("Cannot initialize mpv: python-mpv not installed")
+            return
+        try:
+            self.player = _mpv.MPV(
+                video=False,
+                ytdl=False,
+                ao="pipewire",
+                pipewire_buffer=50,
+                volume=self.volume * 100,
+            )
+            self.player.register_event_callback(self._on_mpv_event)
+            decky.logger.info("mpv initialized with PipeWire backend")
+        except Exception as e:
+            decky.logger.error(f"Failed to initialize mpv: {e}")
+            self.player = None
+
+    def _on_mpv_event(self, event):
+        if not _MPV_AVAILABLE:
+            return
+        if event.event_id == _mpv.MpvEventID.END_FILE:
+            reason = event.event_data.get("reason")
+            if reason == "eof":
+                decky.logger.info("Track ended naturally — advancing queue")
+                threading.Thread(target=self._handle_track_end, daemon=True).start()
+            elif reason == "error":
+                decky.logger.error(f"mpv playback error: {event.event_data}")
+                threading.Thread(target=self._handle_playback_error, daemon=True).start()
+
+    def _handle_track_end(self):
+        try:
+            result = self._advance_queue(1)
+            if result is None or result.get("stopped"):
+                self.is_playing = False
+        except Exception as e:
+            decky.logger.error(f"Error handling track end: {e}")
+
+    def _handle_playback_error(self):
+        decky.logger.error("mpv playback error — skipping to next track")
+        try:
+            result = self._advance_queue(1)
+            if result is None or result.get("stopped"):
+                self.is_playing = False
+        except Exception as e:
+            decky.logger.error(f"Error recovering from playback error: {e}")
+
     async def _main(self):
         decky.logger.info("YouTube Music plugin loaded")
         self._load_settings()
         self._load_queue()
         self._try_init_ytmusic()
+        self._init_mpv()
 
     async def _unload(self):
         decky.logger.info("YouTube Music plugin unloaded")
+        if self.player:
+            try:
+                self.player.terminate()
+            except Exception:
+                pass
+            self.player = None
 
     async def get_auth_state(self):
         """Return current auth status."""
