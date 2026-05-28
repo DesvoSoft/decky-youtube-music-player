@@ -481,13 +481,28 @@ class Plugin:
         self._prefetch_urls(start)
         return {"success": True}
 
+    def _play_url_sync(self, url: str):
+        """Synchronous mpv playback start. Called internally after URL resolution."""
+        if not self.player or not url:
+            return False
+        try:
+            self.player.play(url)
+            self.player.pause = False
+            self.is_playing = True
+            return True
+        except Exception as e:
+            decky.logger.error(f"mpv play failed: {e}")
+            return False
+
     def _current_track_with_url(self):
-        """Return current track metadata + fresh streaming URL."""
+        """Return current track metadata + fresh streaming URL.
+        Feeds the resolved URL to mpv for playback."""
         if not self.queue or self.queue_position >= len(self.queue):
             return None
 
         track = self.queue[self.queue_position]
         url = self._get_streaming_url(track["videoId"])
+        self._play_url_sync(url)
 
         return {
             "videoId": track["videoId"],
@@ -516,14 +531,8 @@ class Plugin:
         """Feed a resolved streaming URL to mpv for playback."""
         if not self.player:
             return {"error": "mpv not initialized"}
-        try:
-            self.player.play(url)
-            self.player.pause = False
-            self.is_playing = True
-            return {"success": True}
-        except Exception as e:
-            decky.logger.error(f"mpv play_url failed: {e}")
-            return {"error": str(e)}
+        ok = self._play_url_sync(url)
+        return {"success": ok} if ok else {"error": "mpv play failed"}
 
     async def resume(self):
         self.is_playing = True
