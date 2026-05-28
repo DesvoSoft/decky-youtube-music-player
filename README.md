@@ -12,7 +12,7 @@ Play YouTube Music directly on your Steam Deck — no external app required. Bui
 - **Player controls** — play, pause, skip, previous
 - **Album art & track info** — see what's playing at a glance
 - **Like / Dislike** — rate songs directly from the player
-- **Volume slider** — adjust volume with PulseAudio system integration
+- **Volume slider** — adjust volume directly
 - **Shuffle & Repeat** — toggle shuffle and cycle repeat modes (Off / All / One)
 - **Queue management** — view your queue, jump to tracks, or remove them
 - **Library** — browse and play your playlists and Liked Songs
@@ -26,7 +26,7 @@ Play YouTube Music directly on your Steam Deck — no external app required. Bui
 
 ## Installation
 
-1. Download the latest `youtube-music-player.zip` from the [Releases](https://github.com/artistro08/decky-youtube-music-player/releases) page
+1. Download the latest `youtube-music-player.zip` from the [Releases](https://github.com/DesvoSoft/decky-youtube-music-player/releases) page
 2. Open Decky on your Steam Deck
 3. Go to the Decky settings (gear icon)
 4. Enable Developer Options
@@ -36,9 +36,18 @@ Play YouTube Music directly on your Steam Deck — no external app required. Bui
 
 ## Setup
 
-This plugin uses browser cookie authentication with YouTube Music. You'll need to copy request headers from a browser session.
+You can authenticate with YouTube Music using **OAuth** (recommended) or **browser cookie auth** (fallback).
 
-### Step 1: Get your browser headers
+### Option A: OAuth (Recommended)
+
+1. Go to Settings in the plugin
+2. Enter your Google OAuth Client ID (create one at [Google Cloud Console](https://console.cloud.google.com/) — app type: "TVs and Limited Input devices")
+3. Click **Sign in with Google**
+4. A device code will appear on screen — go to **google.com/device** on your phone or PC
+5. Enter the code and authorize the app
+6. The plugin will detect the authorization and connect automatically
+
+### Option B: Browser Cookie Auth
 
 1. On your PC, open a browser and go to [music.youtube.com](https://music.youtube.com)
 2. Log in to your Google account
@@ -49,36 +58,21 @@ This plugin uses browser cookie authentication with YouTube Music. You'll need t
    - **Firefox**: Right-click the request > Copy > Copy Request Headers
    - **Chrome**: Click the request, scroll to "Request Headers", copy from `accept: */*` onward
 7. Paste the headers into a text file and save it (e.g. `headers.txt`)
+8. Transfer the file to your Steam Deck (USB, SCP, etc.)
+9. Go to Settings → **Browser Auth (Advanced)**
+10. Enter the file path and click **Load & Connect**
 
-### Step 2: Transfer to your Steam Deck
-
-Transfer the `headers.txt` file to your Steam Deck. You can use:
-- USB drive
-- SSH/SCP (`scp headers.txt deck@steamdeck:/home/deck/headers.txt`)
-- Any file sharing method
-
-### Step 3: Connect the plugin
-
-1. Open the YouTube Music Player plugin in Decky
-2. Click the gear icon to open Settings
-3. Enter the file path to your headers file (default: `/home/deck/headers.txt`)
-4. Click **Load & Connect**
-5. You should see "Authenticated" — you're ready to go!
-
-### Step 4: Play music
+### Playing music
 
 1. Go to the **Library** tab and select a playlist, or use **Search** to find a song
 2. Music will start playing through your Steam Deck's speakers/headphones
 3. Use the Player tab to control playback
 
-> **Note:** Browser credentials typically last around 2 years. If authentication expires, repeat the setup process.
-
 ## How It Works
 
 - **ytmusicapi** handles authentication, library browsing, playlists, search, and song ratings
 - **yt-dlp** extracts streaming URLs (handles YouTube's signature deciphering)
-- **HTML5 `<audio>`** element plays audio through Steam's CEF browser
-- **PulseAudio** integration for system-level volume control
+- **python-mpv + PipeWire** plays audio natively on SteamOS (no CEF browser overhead)
 - All state is managed by the Python backend, so music continues playing even when the Quick Access panel is closed
 
 ## License

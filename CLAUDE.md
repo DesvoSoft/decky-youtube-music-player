@@ -4,11 +4,12 @@ A standalone Decky Loader plugin for the Steam Deck that plays YouTube Music dir
 
 ## Architecture
 
-- **Frontend**: React (TypeScript) UI in the Quick Access Menu panel with a hidden `<audio>` element for playback
+- **Frontend**: React (TypeScript) UI in the Quick Access Menu panel — thin display layer only
 - **Backend**: Python (`main.py`) owns all state — queue, playback, auth, library, ratings
 - **Communication**: Decky's `call()` bridge (frontend → backend), pull-based state sync on panel open
 - **Streaming URLs**: yt-dlp subprocess (handles YouTube signature deciphering)
 - **Metadata/Library**: ytmusicapi (browser cookie auth)
+- **Audio Engine**: python-mpv + PipeWire (native SteamOS audio, no CEF overhead)
 
 ## Project Structure
 
@@ -21,11 +22,11 @@ src/
     LibraryView.tsx      - Library tab: Liked Songs + user playlists, click to load
     SettingsPage.tsx     - Full-screen settings page (browser auth setup, sign out)
     Section.tsx          - Simple section wrapper with optional title label
-    VolumeSlider.tsx     - Volume slider with <audio> + PulseAudio backend
+    VolumeSlider.tsx     - Volume slider; volume synced to mpv backend
   context/
     PlayerContext.tsx    - React context; syncs with audioManager and backend state
   services/
-    audioManager.ts      - Persistent <audio> element outside React, playback controls
+    audioManager.ts      - Thin call() wrapper; state + listeners, no DOM element
   types.ts               - Shared TypeScript types (TrackInfo, PlayerState, RepeatMode)
 dist/
   index.js               - Compiled frontend bundle (built by rollup)
@@ -40,7 +41,7 @@ package.json             - npm manifest; version shown in Decky UI
 - **Frontend**: React (TypeScript), `@decky/ui`, `@decky/api`, `react-icons`
 - **Build**: Rollup via `@decky/rollup`
 - **Backend**: Python (`main.py`) with `ytmusicapi` and `yt-dlp`
-- **Audio**: HTML5 `<audio>` element (CEF/Chromium) + PulseAudio `pactl` for system volume
+- **Audio**: python-mpv + PipeWire (native SteamOS audio, no CEF overhead)
 
 ## Build & Package
 
@@ -91,9 +92,9 @@ youtube-music/
 
 ## Key Implementation Notes
 
-- **Auth**: Browser cookie auth (not OAuth — Google disabled OAuth for YTM innertube API). User copies request headers from browser DevTools to a text file, transfers to Deck, enters file path in settings.
+- **Auth**: OAuth device code flow (primary) with browser cookie auth as fallback. User sets up OAuth client ID in settings, or copies request headers from browser DevTools and transfers to Deck.
 - **Streaming URLs**: yt-dlp runs as a subprocess (not imported as library) because Decky's sandboxed Python is missing stdlib modules like `xml.etree`. `LD_LIBRARY_PATH` is stripped to avoid Decky's bundled OpenSSL conflicting with system Python's ssl module.
-- **Audio persistence**: The `<audio>` element is created in `document.body` (outside React's tree) so it survives Quick Access panel close/open. Named event handler references (`onAudioEnded`, `onAudioError`) ensure proper cleanup.
+- **Audio persistence**: python-mpv manages audio in the backend process, so it survives Quick Access panel close/open. The mpv `end_file` callback handles track transitions.
 - **Tabs height**: `TabsContainer` measures available panel height at runtime by walking up the DOM to the nearest scrollable ancestor.
 - **Fallback UI**: If `Tabs` is not available (older Decky versions), a simple `ButtonItem`-based tab switcher is rendered instead.
 - **Playlist cache**: Library playlists are cached in Python after first fetch for instant tab switching.
