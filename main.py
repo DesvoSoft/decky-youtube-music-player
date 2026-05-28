@@ -223,6 +223,7 @@ class Plugin:
         decky.logger.info("YouTube Music plugin unloaded")
         if self.player:
             try:
+                self.player.stop()
                 self.player.terminate()
             except Exception:
                 pass
@@ -511,13 +512,56 @@ class Plugin:
             return {"error": "Failed to get streaming URL"}
         return result
 
+    async def play_url(self, url: str):
+        """Feed a resolved streaming URL to mpv for playback."""
+        if not self.player:
+            return {"error": "mpv not initialized"}
+        try:
+            self.player.play(url)
+            self.player.pause = False
+            self.is_playing = True
+            return {"success": True}
+        except Exception as e:
+            decky.logger.error(f"mpv play_url failed: {e}")
+            return {"error": str(e)}
+
     async def resume(self):
         self.is_playing = True
+        if self.player:
+            self.player.pause = False
         return {"success": True}
 
     async def pause(self):
         self.is_playing = False
+        if self.player:
+            self.player.pause = True
         return {"success": True}
+
+    async def stop(self):
+        """Stop playback entirely."""
+        self.is_playing = False
+        if self.player:
+            self.player.stop()
+        return {"success": True}
+
+    async def seek(self, position: float):
+        """Seek to a specific position in seconds."""
+        if self.player:
+            self.player.seek(position, reference="absolute")
+        return {"success": True}
+
+    async def get_playback_position(self):
+        """Return current playback position and duration for the frontend progress bar."""
+        if not self.player:
+            return {"position": 0, "duration": 0}
+        try:
+            return {
+                "position": self.player.time_pos or 0,
+                "duration": self.player.duration or 0,
+            }
+        except Exception as e:
+            decky.logger.debug(f"Failed to get playback position: {e}")
+            return {"position": 0, "duration": 0}
 
     def _advance_queue(self, direction=1):
         if not self.queue:
@@ -604,13 +648,14 @@ class Plugin:
     # ── Volume ─────────────────────────────────────────────────────
 
     async def set_volume(self, value):
-        """Set volume. value is 0-100 from frontend. Volume is controlled
-        by the <audio> element on the frontend — backend only persists."""
+        """Set volume. value is 0-100 from frontend. Also syncs to mpv."""
         try:
             value = float(value)
         except (TypeError, ValueError):
             return {"error": f"Invalid volume value: {value!r}"}
         self.volume = max(0, min(100, value)) / 100.0
+        if self.player:
+            self.player.volume = value
         self._save_settings()
         return {"volume": value}
 
