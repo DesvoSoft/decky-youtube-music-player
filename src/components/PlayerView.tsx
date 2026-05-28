@@ -6,7 +6,7 @@ import { IoPlay, IoPlaySkipBack, IoPlaySkipForward } from 'react-icons/io5';
 import { MdRepeat, MdRepeatOne } from 'react-icons/md';
 import { AiOutlineLike, AiFillLike, AiOutlineDislike, AiFillDislike } from 'react-icons/ai';
 import { usePlayer } from '../context/PlayerContext';
-import { togglePlayback, playNext, playPrevious, getAudioElement, seekTo } from '../services/audioManager';
+import { togglePlayback, playNext, playPrevious } from '../services/audioManager';
 import { Section } from './Section';
 import { VolumeSlider } from './VolumeSlider';
 
@@ -114,35 +114,26 @@ export const PlayerView = () => {
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Update progress while playing
+  // Poll playback position from mpv backend
   useEffect(() => {
-    const audio = getAudioElement();
-    if (!audio) return;
+    if (!isPlaying || !track) return;
 
-    const onMeta = () => {
-      setDuration(audio.duration || 0);
-      setCurrentTime(audio.currentTime || 0);
+    const poll = async () => {
+      try {
+        const pos = await call<[], { position: number; duration: number }>('get_playback_position');
+        if (!seeking) setCurrentTime(pos.position);
+        if (pos.duration) setDuration(pos.duration);
+      } catch {}
     };
-    const onTime = () => {
-      if (!seeking) setCurrentTime(audio.currentTime || 0);
-    };
 
-    audio.addEventListener('loadedmetadata', onMeta);
-    audio.addEventListener('timeupdate', onTime);
+    void poll();
+    const interval = setInterval(poll, 1000);
+    return () => clearInterval(interval);
+  }, [track?.videoId, isPlaying, seeking]);
 
-    // Initial fetch
-    if (audio.duration) setDuration(audio.duration);
-    setCurrentTime(audio.currentTime || 0);
-
-    return () => {
-      audio.removeEventListener('loadedmetadata', onMeta);
-      audio.removeEventListener('timeupdate', onTime);
-    };
-  }, [track?.videoId, seeking]);
-
-  const handleSeek = useCallback((val: number) => {
+  const handleSeek = useCallback(async (val: number) => {
     setCurrentTime(val);
-    seekTo(val);
+    await call('seek', val);
   }, []);
 
   const handleSeekStart = useCallback(() => setSeeking(true), []);

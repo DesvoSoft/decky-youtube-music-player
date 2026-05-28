@@ -11,7 +11,6 @@ import { LibraryView } from './components/LibraryView';
 import { Section } from './components/Section';
 import { SettingsPage } from './components/SettingsPage';
 import { SearchPage } from './components/SearchPage';
-import { initAudio, destroyAudio } from './services/audioManager';
 
 const SETTINGS_ROUTE = '/youtube-music-settings';
 const SEARCH_ROUTE = '/youtube-music-search';
@@ -223,7 +222,11 @@ const onSettingsClick = () => {
 };
 
 export default definePlugin(() => {
-  initAudio();
+  // Pause any AudioLoader music to avoid conflict
+  try {
+    const al = (window as any).AUDIOLOADER_MENUMUSIC;
+    if (al && typeof al.pause === 'function') al.pause();
+  } catch {}
   routerHook.addRoute(SETTINGS_ROUTE, () => <SettingsPage />);
   routerHook.addRoute(SEARCH_ROUTE, () => <SearchPage />);
 
@@ -254,7 +257,6 @@ export default definePlugin(() => {
     content: <Content />,
     icon: <FaMusic />,
     onDismount() {
-      destroyAudio();
       routerHook.removeRoute(SETTINGS_ROUTE);
       routerHook.removeRoute(SEARCH_ROUTE);
     },

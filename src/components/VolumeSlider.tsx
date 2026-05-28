@@ -3,7 +3,6 @@ import type { SliderFieldProps } from '@decky/ui';
 import { call } from '@decky/api';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FaVolumeUp } from 'react-icons/fa';
-import { setAudioVolume } from '../services/audioManager';
 
 // Module-level cache — survives tab switches (component remounts)
 let cachedVolume: number | null = null;
@@ -42,7 +41,6 @@ export const VolumeSlider = () => {
         const vol = result.volume;
         cachedVolume = vol;
         setDisplayVolume(vol);
-        setAudioVolume(vol / 100); // sync <audio> element
       } catch (e) {
         console.error('[YTM] Failed to fetch volume:', e);
       }
@@ -60,10 +58,7 @@ export const VolumeSlider = () => {
     setDisplayVolume(val);
     cachedVolume = val;
 
-    // Set <audio> volume immediately for instant response
-    setAudioVolume(val / 100);
-
-    // Debounce the backend + PulseAudio call
+    // Debounce the backend volume call
     if (apiDebounceRef.current) clearTimeout(apiDebounceRef.current);
     apiDebounceRef.current = setTimeout(() => {
       void call('set_volume', val);
