@@ -468,19 +468,6 @@ class Plugin:
                 decky.logger.debug(f"Pre-fetching URL for {tid}")
                 self._get_streaming_url(tid)
 
-    async def prefetch_next(self):
-        """Public method: pre-fetch next 3 tracks from current position."""
-        if self.shuffle and self.shuffle_order:
-            try:
-                pos = self.shuffle_order.index(self.queue_position)
-            except ValueError:
-                pos = self.queue_position
-            start = max(0, pos + 1)
-        else:
-            start = self.queue_position + 1
-        self._prefetch_urls(start)
-        return {"success": True}
-
     def _play_url_sync(self, url: str):
         """Synchronous mpv playback start. Called internally after URL resolution."""
         if not self.player or not url:
@@ -634,10 +621,6 @@ class Plugin:
         if result.get("url") is None:
             return {"error": "Failed to get streaming URL"}
         self._prefetch_urls(self.queue_position + 1)
-        return result
-
-    async def track_ended(self):
-        result = await self.next_track()
         return result
 
     async def get_playback_state(self):
