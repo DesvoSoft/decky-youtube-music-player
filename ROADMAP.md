@@ -7,8 +7,8 @@
 ### Tasks
 
 - [x] Research OAuth alternatives
-- [ ] Create Google Cloud project + OAuth client ID ("TVs and Limited Input devices")
-- [ ] Bundle client_id in plugin config (defaults in `main.py`, overridable via `oauth_config.json`)
+- [x] Create Google Cloud project + OAuth client ID ("TVs and Limited Input devices") — guide in Settings UI
+- [x] Bundle client_id in plugin config (overridable via `oauth_config.json`) — UI in SettingsPage
 - [x] `main.py`: Add `start_oauth()` + `check_oauth()` — device code flow via Google API (raw HTTP)
 - [x] `main.py`: Persist `oauth.json`, re-init YTMusic on load (tries OAuth first, browser fallback)
 - [x] `main.py`: Modify `_try_init_ytmusic()` to try OAuth first, browser fallback
@@ -17,8 +17,9 @@
 - [x] `main.py`: Add `save_oauth_config()` — frontend-adjustable client_id
 - [x] `SettingsPage.tsx`: New OAuth UI — "Sign in with Google" → show code → polling → done
 - [x] `SettingsPage.tsx`: Keep browser auth as collapsible "Advanced" fallback
+- [x] `SettingsPage.tsx`: Add OAuth Client ID configuration UI + Google Cloud setup guide
 - [x] `types.ts`: Add `AuthState`, `OAuthStartResult`, `OAuthCheckResult` interfaces
-- [ ] `PlayerContext.tsx`: React to auth state changes in real-time
+- [x] `PlayerContext.tsx`: React to auth state changes in real-time (refreshAuth on mount + after OAuth)
 - [ ] Build + package + verify (requires Linux/Steam Deck environment)
 
 **Success criteria:**

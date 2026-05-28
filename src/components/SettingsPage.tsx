@@ -19,6 +19,14 @@ const AuthContent = () => {
   const oauthDeviceCode = useRef('');
   const oauthInterval = useRef(5);
 
+  // OAuth client ID config
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [hasClientId, setHasClientId] = useState(false);
+  const [showClientIdForm, setShowClientIdForm] = useState(false);
+  const [showCloudGuide, setShowCloudGuide] = useState(false);
+  const [oauthConfigSaved, setOauthConfigSaved] = useState(false);
+
   // Browser auth state
   const [showBrowserAuth, setShowBrowserAuth] = useState(false);
   const [filePath, setFilePath] = useState('/home/deck/headers.txt');
@@ -29,9 +37,42 @@ const AuthContent = () => {
     void refreshAuth();
   };
 
+  const getOauthConfig = async () => {
+    try {
+      const cfg = await call<[], { client_id: string; has_client_id: boolean }>('get_oauth_config');
+      setHasClientId(cfg.has_client_id);
+      if (cfg.client_id) setClientId(cfg.client_id);
+    } catch {}
+  };
+
   useEffect(() => {
     void getState();
+    void getOauthConfig();
   }, []);
+
+  // ── OAuth Client ID config ──
+
+  const handleSaveOauthConfig = async () => {
+    if (!clientId.trim()) return;
+    setError('');
+    setSaving(true);
+    setOauthConfigSaved(false);
+    try {
+      const result = await call<[string, string], { success?: boolean; error?: string }>(
+        'save_oauth_config', clientId.trim(), clientSecret.trim()
+      );
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setHasClientId(true);
+        setOauthConfigSaved(true);
+        setShowClientIdForm(false);
+      }
+    } catch (e) {
+      setError(String(e));
+    }
+    setSaving(false);
+  };
 
   // ── OAuth ──
 
@@ -163,9 +204,93 @@ const AuthContent = () => {
                 Connect your YouTube Music account using Google's secure login.
                 No file transfers needed.
               </div>
-              <ButtonItem onClick={() => void handleStartOAuth()}>
-                {saving ? 'Starting...' : 'Sign in with Google'}
-              </ButtonItem>
+
+              {/* OAuth Client ID configuration */}
+              {!hasClientId || showClientIdForm ? (
+                <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '12px', color: '#ffa500', marginBottom: '8px' }}>
+                    {hasClientId ? 'Update your' : 'First, set up your'} Google OAuth Client ID:
+                  </div>
+                  <TextField
+                    placeholder="Client ID (required)"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                  />
+                  <div style={{ height: '8px' }} />
+                  <TextField
+                    placeholder="Client Secret (optional)"
+                    value={clientSecret}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                  />
+                  <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+                    <DialogButton
+                      style={{ flex: 1, fontSize: '12px', padding: '6px 12px', minWidth: 0 }}
+                      onClick={() => void handleSaveOauthConfig()}
+                      disabled={saving || !clientId.trim()}
+                    >
+                      {saving ? 'Saving...' : 'Save'}
+                    </DialogButton>
+                    {hasClientId && (
+                      <DialogButton
+                        style={{ fontSize: '12px', padding: '6px 12px', minWidth: 0 }}
+                        onClick={() => setShowClientIdForm(false)}
+                      >
+                        Cancel
+                      </DialogButton>
+                    )}
+                  </div>
+                  {oauthConfigSaved && (
+                    <div style={{ color: '#4caf50', fontSize: '11px', marginTop: '6px' }}>
+                      ✓ Client ID saved
+                    </div>
+                  )}
+
+                  {/* Google Cloud guide */}
+                  <Focusable
+                    flow-children="horizontal"
+                    style={{ cursor: 'pointer', marginTop: '12px', padding: '4px 0' }}
+                    onClick={() => setShowCloudGuide(!showCloudGuide)}
+                  >
+                    <span style={{ fontSize: '11px', color: showCloudGuide ? '#aaa' : '#888', userSelect: 'none' }}>
+                      {showCloudGuide ? '▼' : '▶'} How to get a Client ID
+                    </span>
+                  </Focusable>
+                  {showCloudGuide && (
+                    <div style={{ fontSize: '11px', color: '#888', lineHeight: '1.6', marginTop: '4px', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px' }}>
+                      <div>1. Go to <span style={{ color: '#66c0ff' }}>console.cloud.google.com</span></div>
+                      <div>2. Create a project (e.g. "Decky YTMusic")</div>
+                      <div>3. Go to <strong>APIs & Services → Library</strong></div>
+                      <div>4. Enable <strong>YouTube Data API v3</strong></div>
+                      <div>5. Go to <strong>Credentials → Create Credentials → OAuth client ID</strong></div>
+                      <div>6. Application type: <strong>TVs and Limited Input devices</strong></div>
+                      <div>7. Name: "Decky YouTube Music Player"</div>
+                      <div>8. Copy the <strong>Client ID</strong> and paste above</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#4caf50', marginBottom: '8px' }}>
+                    ✓ OAuth Client ID configured
+                  </div>
+                  <DialogButton
+                    style={{ fontSize: '11px', padding: '4px 8px', minWidth: 0, width: 'auto', background: 'rgba(255,255,255,0.1)' }}
+                    onClick={() => setShowClientIdForm(true)}
+                  >
+                    Change
+                  </DialogButton>
+                </div>
+              )}
+
+              {hasClientId ? (
+                <ButtonItem onClick={() => void handleStartOAuth()}>
+                  {saving ? 'Starting...' : 'Sign in with Google'}
+                </ButtonItem>
+              ) : (
+                <div style={{ fontSize: '11px', color: '#888', marginTop: '6px' }}>
+                  Configure a Client ID above to enable Google sign-in.
+                </div>
+              )}
             </div>
           ) : (
             <div>
